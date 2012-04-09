@@ -27,9 +27,9 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "/testContext.xml" })
-public class RedisIntegerDataTypTest {
+public class IntegerWrapperClassTest {
 
-	Logger logger = LoggerFactory.getLogger(RedisIntegerDataTypTest.class);
+	Logger logger = LoggerFactory.getLogger(IntegerWrapperClassTest.class);
 
 	@Autowired
 	private RedisTemplate<String, Integer> template;

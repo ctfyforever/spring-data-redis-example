@@ -27,9 +27,9 @@ import org.springframework.util.CollectionUtils;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "/testContext.xml" })
-public class RedisSetOperationsTest {
+public class SetOperationsTest {
 
-	Logger logger = LoggerFactory.getLogger(RedisSetOperationsTest.class);
+	Logger logger = LoggerFactory.getLogger(SetOperationsTest.class);
 
 	@Autowired
 	private RedisTemplate<String, Integer> template;
