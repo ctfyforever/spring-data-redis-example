@@ -3,6 +3,7 @@ package com.devpg.redis;
 import java.util.Random;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -17,39 +18,56 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "/testContext.xml" })
-public class PipelinePerformanceTest {
+public class PipelineSetAddPerformanceTest {
 
-	Logger logger = LoggerFactory.getLogger(PipelinePerformanceTest.class);
+	Logger logger = LoggerFactory
+			.getLogger(PipelineSetAddPerformanceTest.class);
 
 	@Autowired
 	RedisTemplate<String, Integer> template;
 
 	private final int elementsCount = 100000;
-	private final String seqFilledSet = "perf-set-seq";
+	private final String sequentialFilledSet = "perf-set-seq";
 	private String pipelinedSet = "perf-set-pipe";
 
 	@After
-	public void dropData() {
-		template.delete(seqFilledSet);
+	public void deleteSampleData() {
+		template.delete(sequentialFilledSet);
 		template.delete(pipelinedSet);
 	}
 
 	@Test
-	public void measureSequentialSAdd() {
-		Random randomGenerator = new Random();
+	public void pipelineAddShouldBeFasterThanSequentialMode() {
+		final Double durationSequentialAdd = getDurationForSequentialAdd();
+		logger.info("Sequential SAdd took {} ms ({} SADD/sec)", new Object[] {
+				durationSequentialAdd, durationSequentialAdd / elementsCount });
 
-		long start = System.currentTimeMillis();
-		for (int i = 1; i <= elementsCount; i++) {
-			template.opsForSet().add(seqFilledSet, randomGenerator.nextInt());
+		final Integer[] chunkDefinitions = new Integer[] { 10000, 1000, 100, 10 };
+		for (Integer chunkDefinition : chunkDefinitions) {
+			final Double durationPipelinedAdd = getDurationForPipelinedAdd(chunkDefinition);
+			logger.info(
+					"Pipelined SAdd (chunks: {}) took {} ms ({} SADD/sec)",
+					new Object[] { chunkDefinition, durationPipelinedAdd,
+							durationPipelinedAdd / elementsCount });
+
+			Assert.assertTrue(durationPipelinedAdd < durationSequentialAdd);
 		}
-		long duration = System.currentTimeMillis() - start;
-		logger.info(seqFilledSet + ": " + (elementsCount / duration)
-				+ " SADD/sec");
 	}
 
-	@Test
-	public void measurePipelinedSAdd() {
-		final int chunks = 10;
+	private double getDurationForSequentialAdd() {
+		final long start = System.currentTimeMillis();
+		final Random randomGenerator = new Random();
+
+		for (int i = 1; i <= elementsCount; i++) {
+			template.opsForSet().add(sequentialFilledSet,
+					randomGenerator.nextInt());
+		}
+		return System.currentTimeMillis() - start;
+	}
+
+	private double getDurationForPipelinedAdd(int chunks) {
+		final long start = System.currentTimeMillis();
+
 		final int chunkSize = elementsCount / chunks;
 		final Random randomGenerator = new Random();
 
@@ -69,12 +87,9 @@ public class PipelinePerformanceTest {
 			}
 		};
 
-		long start = System.currentTimeMillis();
 		for (int i = 0; i <= chunks; i++) {
 			template.execute(pipedSAddCallback, true, true);
 		}
-		long duration = System.currentTimeMillis() - start;
-		logger.info(pipelinedSet + " " + (elementsCount / duration)
-				+ " SADD/sec");
+		return System.currentTimeMillis() - start;
 	}
 }

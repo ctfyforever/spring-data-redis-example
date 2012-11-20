@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericToStringSerializer;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.data.redis.support.atomic.RedisAtomicInteger;
 import org.springframework.test.context.ContextConfiguration;
@@ -27,47 +28,29 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "/testContext.xml" })
-public class IntegerWrapperClassTest {
+public class AtomicCounterTest {
 
-	Logger logger = LoggerFactory.getLogger(IntegerWrapperClassTest.class);
+	Logger logger = LoggerFactory.getLogger(AtomicCounterTest.class);
 
 	@Autowired
 	private RedisTemplate<String, Integer> template;
 
-	private final String counterKey = "type-counter";
-	RedisAtomicInteger counterWrapper;
+	private final String counterKey = "atomic-counter";
+	private RedisAtomicInteger counter;
+
+	private RedisSerializer<?> defaultKeySerializer;
+	private RedisSerializer<?> defaultValueSerializer;
 
 	@Before
-	public void setupDataTypes() {
+	public void setupCounterAndConfigureRedisSerializer() {
 		/*
 		 * Wrap key "type-counter" as RedisAtomicInteger and set value to 1 (by
 		 * default this value will be set to 0 if the key doesn't exist)
 		 */
-		counterWrapper = new RedisAtomicInteger(counterKey,
+		counter = new RedisAtomicInteger(counterKey,
 				template.getConnectionFactory(), 1);
-	}
-
-	@After
-	public void deleteExampleDataTypes() {
-		template.delete(counterKey);
-	}
-
-	@Test
-	public void accessCounterAUsingWrapperClass() {
-		int count = counterWrapper.getAndIncrement();
-		Assert.assertEquals(count + 1, counterWrapper.get());
-
-		count = counterWrapper.getAndDecrement();
-		Assert.assertEquals(count - 1, counterWrapper.get());
-	}
-
-	@Test
-	public void accessCounterUsingRedisTemplate() {
 
 		/*
-		 * Instead of using the wrapper classes you can also utilize
-		 * RedisTemplate.
-		 * 
 		 * Attention: Spring Data - Redis uses serializers to serialize and
 		 * deserialize Objects to byte array (binary data). Due to different
 		 * key/value serializer (RedisAtomicInteger is using
@@ -76,10 +59,34 @@ public class IntegerWrapperClassTest {
 		 * accessed by the other. To make it work you have to equalize the
 		 * serializers.
 		 */
+		defaultKeySerializer = template.getKeySerializer();
+		defaultValueSerializer = template.getValueSerializer();
 
 		template.setKeySerializer(new StringRedisSerializer());
 		template.setValueSerializer(new GenericToStringSerializer<Integer>(
 				Integer.class));
-		Assert.assertNotNull(template.boundValueOps(counterKey).get());
+	}
+
+	@After
+	public void deleteSampleDataAndSetRedisDefaultSerializer() {
+		template.delete(counterKey);
+		
+		template.setKeySerializer(defaultKeySerializer);
+		template.setValueSerializer(defaultValueSerializer);
+	}
+
+	@Test
+	public void accessCounterAUsingWrapperClass() {
+		int count = counter.getAndIncrement();
+		Assert.assertEquals(count + 1, counter.get());
+
+		count = counter.getAndDecrement();
+		Assert.assertEquals(count - 1, counter.get());
+	}
+
+	@Test
+	public void accessCounterUsingRedisTemplate() {
+		Assert.assertEquals(counter.get(), template.boundValueOps(counterKey)
+				.get().intValue());
 	}
 }
