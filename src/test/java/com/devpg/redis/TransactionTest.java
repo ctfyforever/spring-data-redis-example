@@ -53,7 +53,6 @@ public class TransactionTest {
 				operations.multi();
 				operations.boundValueOps(key).set(valueSetWithinSession);
 				operations.exec();
-				operations.unwatch();
 
 				return null;
 			}
